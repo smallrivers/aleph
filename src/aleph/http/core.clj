@@ -110,7 +110,8 @@
 	
 	(cond
 	  
-	  (and auto-transform? (.startsWith ^String content-type "application/json"))
+	  (and auto-transform? (or (.startsWith ^String content-type "application/json")
+	                           (.startsWith ^String content-type "text/javascript")))
 	  (update-in aleph-msg [:body] decode-json)
 	  
 	  (and auto-transform? (.startsWith ^String content-type "application/xml"))
