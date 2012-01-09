@@ -11,9 +11,9 @@
   (:use
     [lamina core])
   (:require
-    [clojure.data.json :as json]
     [clojure.xml :as xml]
-    [clojure.contrib.prxml :as prxml])
+    [clojure.contrib.prxml :as prxml]
+    [cheshire.core :as cheshire])
   (:import
     [java.io
      InputStream
@@ -292,7 +292,7 @@
   [data]
   (let [stream (bytes->input-stream data)]
     (when (pos? (.available stream))
-      (-> stream InputStreamReader. (json/read-json-from true false nil)))))
+      (-> stream InputStreamReader. (cheshire/parse-stream true)))))
 
 (defn encode-json->bytes
   "Transforms a Clojure data structure to JSON, and returns a byte representation of the encoded data."
@@ -300,8 +300,7 @@
   (when data
     (let [output (ByteArrayOutputStream.)
 	  writer (PrintWriter. output)]
-      (json/write-json data writer false)
-      (.flush writer)
+      (cheshire/generate-stream data writer)
       (-> output .toByteArray to-channel-buffer))))
 
 (defn encode-json->string
