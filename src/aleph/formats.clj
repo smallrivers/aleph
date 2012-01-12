@@ -13,7 +13,8 @@
   (:require
     [clojure.xml :as xml]
     [clojure.contrib.prxml :as prxml]
-    [cheshire.core :as cheshire])
+    [cheshire.core :as cheshire]
+    [cheshire.factory :as cheshire-factory])
   (:import
     [java.io
      InputStream
@@ -33,7 +34,9 @@
      ChannelBufferInputStream
      ByteBufferBackedChannelBuffer]
     [java.security
-     MessageDigest]))
+     MessageDigest]
+    [org.codehaus.jackson
+     JsonGenerator$Feature]))
 
 ;;;
 
@@ -286,6 +289,9 @@
     (-> string string->channel-buffer Base64/decode)))
 
 ;;;
+
+;; Allow cheshire to escape non ascii chars
+(.configure cheshire-factory/factory JsonGenerator$Feature/ESCAPE_NON_ASCII true)
 
 (defn decode-json
   "Takes bytes or a string that contain JSON, and returns a Clojure data structure representation."
