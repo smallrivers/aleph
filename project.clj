@@ -6,12 +6,13 @@
             :distribution :repo}
   :dependencies [[org.clojure/clojure "1.3.0"]
                  [org.clojure/tools.logging "0.2.3"]
-                 [org.clojure/data.json "0.1.1"]
+                 [cheshire "2.0.4"]
                  [org.clojure.contrib/prxml "1.3.0-alpha4"]
                  [org.jboss.netty/netty "3.2.5.Final"]
                  [clj-http "0.1.3"]
-                 [lamina "0.4.1-SNAPSHOT"]
-                 [gloss "0.2.1-SNAPSHOT"]
+                 [org.clojars.smallrivers/lamina "0.4.1-SNAPSHOT"]
+                 [gloss "0.2.1-20111019.122151-3"]
                  [user-agent-utils "1.2.3"]
-                 [potemkin "0.1.1-SNAPSHOT"]]
+                 [potemkin "0.1.1-20111019.122151-1"]]
+  :exclusions    [lamina]
   :jvm-opts ["-server" "-XX:+UseConcMarkSweepGC"])
