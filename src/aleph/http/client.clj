@@ -19,9 +19,13 @@
   (:import
     [java.util.concurrent
      TimeoutException]
+    [org.jboss.netty.util
+     HashedWheelTimer]
     [org.jboss.netty.handler.codec.http.websocket
      WebSocketFrameEncoder
      WebSocketFrameDecoder]
+    [org.jboss.netty.handler.timeout
+     ReadTimeoutHandler]
     [org.jboss.netty.handler.codec.http
      HttpRequest
      HttpResponse
@@ -59,8 +63,15 @@
 
 ;;;
 
+(def timer (atom nil))
+
+(defn- get-timer
+  []
+  (swap! timer #(or % (HashedWheelTimer.))))
+
 (defn create-pipeline [client options]
   (let [responses (channel)
+        timeout (or (:timeout options) -1)
         init? (atom false)
         stages [:codec (HttpClientCodec.)
                 :inflater (HttpContentDecompressor.)
@@ -68,6 +79,11 @@
                            (fn [netty-channel rsp]
                              (enqueue client rsp)
                              nil))]
+        stages (if-not (neg? timeout)
+                 (concat
+                   [:read-timeout (ReadTimeoutHandler. (get-timer) (-> timeout (/ 1000) int))]
+                   stages)
+                  stages)
         pipeline (apply create-netty-pipeline (:name options)
                         (if (= "https" (:scheme options))
                           (concat [:ssl (create-ssl-handler options)]
@@ -159,45 +175,47 @@
   ([request]
      (http-request request -1))
   ([request timeout]
-     (let [start (System/currentTimeMillis)
-	   elapsed #(- (System/currentTimeMillis) start)
-	   latch (atom false)
-	   request (merge {:keep-alive? false} request)
-	   response (result-channel)]
+    (let [;start (System/currentTimeMillis)
+	        ;elapsed #(- (System/currentTimeMillis) start)
+	        ;latch (atom false)
+	        request (merge {:keep-alive? false :timeout timeout} request)
+	        response (result-channel)]
 
-       ;; timeout
-       (when-not (neg? timeout)
-	 (run-pipeline nil
-           (wait-stage (- timeout (elapsed)))
-	   (fn [_]
-	     (when (compare-and-set! latch false true)
-	       (error! response
-		 (TimeoutException. (str "HTTP request timed out after " (elapsed) " milliseconds.")))))))
+    ;; request
+    (let [connection (http-connection
+			                (update-in request [:probes :errors] #(or % nil-channel)))
+	        close-connection (pipeline :error-handler (fn [_]) close)]   		        
+      ; (when-not (neg? timeout)
+      ;       (run-pipeline nil
+      ;     (wait-stage (- timeout (elapsed)))
+      ;         (fn [_]
+      ;           (when (compare-and-set! latch false true)
+      ;           (println "timeout...")
+      ;           ;(enqueue ch nil)
+      ;           (close-connection connection)
+      ;           (error! response
+      ;             (TimeoutException. (str "HTTP request timed out after " (elapsed) " milliseconds.")))))))
 
-       ;; request
-       (let [connection (http-connection
-			  (update-in request [:probes :errors]
-			    #(or % nil-channel)))
-	     close-connection (pipeline :error-handler (fn [_]) close)]
-	 (run-pipeline connection
-	   :error-handler (fn [ex]
-			    (close-connection connection)
-			    (when-not (instance? TimeoutException)
-			      (error! response ex)))
-	   (fn [ch]
-	     (enqueue ch request)
-	     (read-channel ch timeout))
-	   (fn [rsp]
-	     (if (compare-and-set! latch false true)
-	       (do
-		 (if (channel? (:body rsp))
-		   (on-closed (:body rsp)
-		     #(close-connection connection))
-		   (close-connection connection))
-		 (success! response rsp))
-	       (close-connection connection)))))
-
-       response)))
+      (run-pipeline connection
+	      :error-handler (fn [ex]
+	                      (println "ERROR")
+			                  (close-connection connection)
+                        (error! response ex))
+                        ; (when-not (instance? TimeoutException)
+                        ;   (error! response ex)))
+	      (fn [ch]
+	        (enqueue ch request)
+	        (read-channel ch))
+	      (fn [rsp]
+	        ;(if (compare-and-set! latch false true)
+	          (do
+		          (if (channel? (:body rsp))
+		            (on-closed (:body rsp) #(close-connection connection))
+		            (close-connection connection))
+		          ;(println "got" rsp)
+		          (success! response rsp)))))
+            ;(close-connection connection)))))
+    response)))
 
 ;;;
 
