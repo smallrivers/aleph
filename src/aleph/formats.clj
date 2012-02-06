@@ -11,6 +11,7 @@
   (:use
     [lamina core])
   (:require
+    [clojure.tools.logging :as log]
     [clojure.xml :as xml]
     [clojure.contrib.prxml :as prxml]
     [cheshire.core :as cheshire]
@@ -296,9 +297,15 @@
 (defn decode-json
   "Takes bytes or a string that contain JSON, and returns a Clojure data structure representation."
   [data]
-  (let [stream (bytes->input-stream data)]
-    (when (pos? (.available stream))
-      (-> stream InputStreamReader. (cheshire/parse-stream true)))))
+  (try
+    (let [stream (bytes->input-stream data)]
+      (when (pos? (.available stream))
+        (-> stream InputStreamReader. (cheshire/parse-stream true))))
+  (catch Exception e
+    (try
+      (log/errorf e "Error while decoding json: %s" (bytes->string data))
+    (catch Exception e
+      (log/errorf e "Error while decoding string"))))))
 
 (defn encode-json->bytes
   "Transforms a Clojure data structure to JSON, and returns a byte representation of the encoded data."
