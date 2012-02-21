@@ -6,7 +6,7 @@
             :distribution :repo}
   :dependencies [[org.clojure/clojure "1.3.0"]
                  [org.clojure/tools.logging "0.2.3"]
-                 [org.clojure/data.json "0.1.1"]
+                 [cheshire "2.2.0"]
                  [org.clojure.contrib/prxml "1.3.0-alpha4"]
                  [io.netty/netty "3.3.0.Final"]
                  [clj-http "0.1.3"]

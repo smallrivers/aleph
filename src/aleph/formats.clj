@@ -291,9 +291,6 @@
 
 ;;;
 
-;; Allow cheshire to escape non ascii chars
-(.configure cheshire-factory/factory JsonGenerator$Feature/ESCAPE_NON_ASCII true)
-
 (defn decode-json
   "Takes bytes or a string that contain JSON, and returns a Clojure data structure representation."
   [data]
