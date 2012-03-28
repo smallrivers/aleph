@@ -15,7 +15,7 @@
                  [gloss "0.2.1-beta1"]
                  [user-agent-utils "1.2.3"]
                  [cheshire "2.0.4"]
-                 [potemkin "0.1.1"]]
+                 [potemkin "0.1.2"]]
   :multi-deps {:all [[org.clojure/tools.logging "0.2.3"]
                      [org.clojure/data.json "0.1.1"]
                      [org.clojure.contrib/prxml "1.3.0-alpha4"]
