@@ -13,6 +13,8 @@
     [aleph.http core]
     [aleph.http.server requests responses]
     [aleph formats netty])
+  (:require
+    [clojure.string :as str])
   (:import
     [org.jboss.netty.handler.codec.http
      HttpRequest
@@ -41,10 +43,10 @@
 (set! *warn-on-reflection* true)
 
 (defn create-handshaker [^HttpRequest req]
-  (when (= "Upgrade" (.getHeader req "Connection"))
+  (when (= "websocket" (str/lower-case (or (.getHeader req "Upgrade") "")))
     (->
       (WebSocketServerHandshakerFactory.
-        (str "ws://" (.getHeaders req "Host") (.getUri req))
+        (str "ws://" (.getHeader req "Host") (.getUri req))
         nil
         false)
       (.newHandshaker req))))
@@ -90,16 +92,32 @@
                  (reset! handshaker h)
                  (-> ctx .getPipeline (.addFirst "workaround" (HttpChunkAggregator. 1)))
                  (.handshake ^WebSocketServerHandshaker @handshaker netty-channel msg)
+
+                 ;;
                  (receive-all outer
                    (fn [[returned-result msg]]
                      (when msg
                        (siphon-result
                          (write-to-channel netty-channel (wrap-frame msg) false)
                          returned-result))))
+
+
+                 ;;
+                 (run-pipeline (.getCloseFuture netty-channel)
+                   wrap-netty-channel-future
+                   (fn [_]
+                     (close inner)
+                     (close outer)))
+
+
+                 (on-drained outer #(.close netty-channel))
+                 
+                 ;;
                  (handler
                    inner
                    (assoc (transform-netty-request msg netty-channel options)
-                     :websocket true)))
+                     :websocket true))
+                 )
                (.sendUpstream ctx evt))
              (if @handshaker
                (when-not (automatic-reply netty-channel @handshaker msg)

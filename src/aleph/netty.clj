@@ -263,12 +263,13 @@
   [^Channel netty-channel msg close?
    & {close-callback :on-close write-callback :on-write host :host port :port}]
   (if msg
-    (run-pipeline
-      (io!
-	(if (and host port)
-	  (.write netty-channel msg (InetSocketAddress. ^String host (int port)))
-	  (.write netty-channel msg)))
+    (run-pipeline nil
       :error-handler (fn [_])
+      (fn [_]
+        (io!
+          (if (and host port)
+            (.write netty-channel msg (InetSocketAddress. ^String host (int port)))
+            (.write netty-channel msg))))
       wrap-netty-channel-future
       (fn [_]
 	(when write-callback
@@ -361,12 +362,13 @@
                    ;;:thread-pool {:max-thread-count (.availableProcessors (Runtime/getRuntime))}
                    }
 		  options)
-        tp (let [tp (merge
-                      {:name (str (:name options) ":thread-pool")}
-                      (:thread-pool options))]
-             (if-not (map? tp)
-               tp
-               (thread-pool tp)))
+        tp (when (contains? options :thread-pool)
+             (let [tp (merge
+                        {:name (str (:name options) ":thread-pool")}
+                        (:thread-pool options))]
+               (if-not (map? tp)
+                 tp
+                 (thread-pool tp))))
         options (assoc options
                   :thread-pool tp)
 	refuse-connections? (atom false)
@@ -408,7 +410,8 @@
 	  wrap-netty-channel-group-future
 	  (fn [_]
 	    (future
-              (shutdown-thread-pool thread-pool)
+              (when tp
+                (shutdown-thread-pool tp))
               (.releaseExternalResources server)))))
       (stop-server [this timeout]
 	(reset! refuse-connections? true)

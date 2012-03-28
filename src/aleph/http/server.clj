@@ -85,17 +85,23 @@
                 wrap-netty-channel-future
                 (fn [_] (close ch)))
 
-              (run-pipeline
-		(receive-in-order (consume-request-stream netty-channel ch server-generator options)
-		  (fn [{:keys [request response]}]
-		    (if (instance? Exception response)
-		      (let [response (if (or
-					   (instance? InterruptedException response)
-					   (instance? TimeoutException response))
-				       (timeout-response)
-				       (error-response))]
-			(write-to-channel netty-channel response (not (:keep-alive? request))))
-		      (respond netty-channel options (first response) (second response)))))
+              (run-pipeline nil
+                :error-handler (fn [_]
+                                 (.close netty-channel)
+                                 (complete nil))
+		(fn [_]
+                  (receive-in-order (consume-request-stream netty-channel ch server-generator options)
+                    (fn [{:keys [request response]}]
+                      (if (instance? Exception response)
+                        (let [response (if (or
+                                             (instance? InterruptedException response)
+                                             (instance? TimeoutException response))
+                                         (timeout-response)
+                                         (error-response))]
+                          (write-to-channel netty-channel response (not (:keep-alive? request))))
+                        (do
+                          (respond netty-channel options (first response) (second response))
+                          nil)))))
 		(fn [_] (.close netty-channel))))
             
 	    (enqueue ch request)))
@@ -119,8 +125,10 @@
     pipeline))
 
 (defn start-http-server
-  "Starts an HTTP server on the specified :port.  To support WebSockets, set :websocket to
-   true.
+  "Starts an HTTP server on the specified :port.  Returns a function that can be used to
+   stop the server.
+
+   To support WebSockets, set :websocket to true.
 
    'handler' should be a function that takes two parameters, a channel and a request hash.
    The request is a hash that conforms to the Ring standard, with :websocket set to true
